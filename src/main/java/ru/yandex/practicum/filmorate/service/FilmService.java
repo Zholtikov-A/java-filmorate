@@ -36,12 +36,13 @@ public class FilmService {
             log.info("Validation failed! " + message);
             throw new ValidationException(message);
         } else if (film.getDescription().length() > maxFilmDescriptionLength) {
-            String message = "Field \"description\" length can't be more then " + maxFilmDescriptionLength + " symbols. Received input length: "
-                    + film.getDescription().length() + " symbols";
+            String message = "Field \"description\" length can't be more then " + maxFilmDescriptionLength + " symbols." +
+                    " Received input length: " + film.getDescription().length() + " symbols";
             log.info("Validation failed! " + message);
             throw new ValidationException(message);
         } else if (film.getReleaseDate().isBefore(minFilmRealiseDate)) {
-            String message = "Field \"releaseDate\" can't contain date early then \"" + minFilmRealiseDate + "\". Input received: \"" + film.getReleaseDate() + "\"";
+            String message = "Field \"releaseDate\" can't contain date early then \"" + minFilmRealiseDate + "\". " +
+                    "Input received: \"" + film.getReleaseDate() + "\"";
             log.info("Validation failed! " + message);
             throw new ValidationException(message);
         } else if (film.getDuration() < 0) {

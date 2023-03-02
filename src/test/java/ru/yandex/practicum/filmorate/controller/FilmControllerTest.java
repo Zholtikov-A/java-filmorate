@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.service.FilmService;
 
 import java.time.LocalDate;
 import java.time.Month;
@@ -15,10 +16,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class FilmControllerTest {
 
     static FilmController controller;
+    static FilmService service;
 
     @BeforeEach
     void init() {
-        controller = new FilmController();
+        service = new FilmService();
+        controller = new FilmController(service);
     }
 
     @Test
