@@ -10,9 +10,8 @@ import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.ErrorResponse;
 import ru.yandex.practicum.filmorate.exceptions.UserNotFoundException;
 
-@RestControllerAdvice(basePackages = "ru.yandex.practicum.filmorate.controllers")
+@RestControllerAdvice(basePackages = "ru.yandex.practicum.filmorate.controller")
 public class ErrorHandler {
-
 
     @ExceptionHandler
     @ResponseStatus(HttpStatus.NOT_FOUND)

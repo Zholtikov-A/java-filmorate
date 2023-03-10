@@ -20,8 +20,7 @@ public class UserService {
         for (User user : userStorage.findAll()) {
             if (user.getId() == userId) {
                 isUserIdCorrect = true;
-            }
-            if (user.getId() == friendId) {
+            } else if (user.getId() == friendId) {
                 isFriendIdCorrect = true;
             }
         }
