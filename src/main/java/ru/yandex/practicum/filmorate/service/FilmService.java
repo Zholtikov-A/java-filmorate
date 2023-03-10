@@ -1,96 +1,82 @@
 package ru.yandex.practicum.filmorate.service;
 
-import lombok.AccessLevel;
-import lombok.experimental.FieldDefaults;
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.exceptions.ValidationException;
+import ru.yandex.practicum.filmorate.exceptions.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.time.LocalDate;
-import java.time.Month;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
-@Slf4j
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@RequiredArgsConstructor
 public class FilmService {
 
-    final Map<Long, Film> films = new HashMap<>();
-    final int maxFilmDescriptionLength = 200;
-    final LocalDate minFilmRealiseDate = LocalDate.of(1895, Month.DECEMBER, 28);
-    Long filmIdCounter = 0L;
+    private final FilmStorage filmStorage;
+    private final UserStorage userStorage;
 
-    Long generateFilmId() {
-        return ++filmIdCounter;
-    }
-
-    @PostMapping()
-    public Film create(Film film) {
-        if (film.getName() == null || film.getName().isEmpty() || film.getName().isBlank()) {
-            String message = "Field \"name\" can't be empty/null. Input received: \"" + film.getName() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (film.getDescription().length() > maxFilmDescriptionLength) {
-            String message = "Field \"description\" length can't be more then " + maxFilmDescriptionLength + " symbols." +
-                    " Received input length: " + film.getDescription().length() + " symbols";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (film.getReleaseDate().isBefore(minFilmRealiseDate)) {
-            String message = "Field \"releaseDate\" can't contain date early then \"" + minFilmRealiseDate + "\". " +
-                    "Input received: \"" + film.getReleaseDate() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (film.getDuration() < 0) {
-            String message = "Value of field \"duration\" can't be negative. Input received: \"" + film.getDuration() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else {
-            film.setId(generateFilmId());
-            films.put(film.getId(), film);
-            log.info("New film created: " + film);
-            return film;
+    public Film addLike(Long filmId, Long userId) {
+        boolean isFilmIdCorrect = false;
+        for (Film film : filmStorage.findAll()) {
+            if (film.getId() == filmId) {
+                isFilmIdCorrect = true;
+                break;
+            }
         }
-    }
-
-    @PutMapping()
-    public Film update(Film film) {
-        if (!films.containsKey(film.getId())) {
-            String message = "Film with such ID not found. Input received: \"" + film.getId() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (film.getName() == null || film.getName().isEmpty() || film.getName().isBlank()) {
-            String message = "Field \"name\" can't be empty/null. Input received: \"" + film.getName() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (film.getDescription().length() > maxFilmDescriptionLength) {
-            String message = "Field \"description\" length can't be more then " + maxFilmDescriptionLength + " symbols. Received input length: "
-                    + film.getDescription().length() + " symbols";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (film.getReleaseDate().isBefore(minFilmRealiseDate)) {
-            String message = "Field \"releaseDate\" can't contain date early then \"" + minFilmRealiseDate + "\". Input received: \"" + film.getReleaseDate() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (film.getDuration() < 0) {
-            String message = "Value of field \"duration\" can't be negative. Input received: \"" + film.getDuration() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else {
-            films.put(film.getId(), film);
-            log.info(film.toString());
-            return film;
+        if (!isFilmIdCorrect) {
+            throw new FilmNotFoundException("User with ID \"" + userId + "\" not found");
         }
+        boolean isUserIdCorrect = false;
+        for (User user : userStorage.findAll()) {
+            if (user.getId() == userId) {
+                isUserIdCorrect = true;
+                break;
+            }
+        }
+        if (!isUserIdCorrect) {
+            throw new FilmNotFoundException("User with ID \"" + userId + "\" not found");
+        }
+        filmStorage.findFilmById(filmId).getLikes().add(userId);
+        return filmStorage.findFilmById(filmId);
     }
 
-    @GetMapping()
-    public List<Film> findAll() {
-        return new ArrayList<>(films.values());
+    public Film removeLike(Long filmId, Long userId) {
+        boolean isFilmIdCorrect = false;
+        for (Film film : filmStorage.findAll()) {
+            if (film.getId() == filmId) {
+                isFilmIdCorrect = true;
+                break;
+            }
+        }
+        if (!isFilmIdCorrect) {
+            throw new FilmNotFoundException("User with ID \"" + userId + "\" not found");
+        }
+        boolean isUserIdCorrect = false;
+        for (User user : userStorage.findAll()) {
+            if (user.getId() == userId) {
+                isUserIdCorrect = true;
+                break;
+            }
+        }
+        if (!isUserIdCorrect) {
+            throw new FilmNotFoundException("User with ID \"" + userId + "\" not found");
+        }
+        filmStorage.findFilmById(filmId).getLikes().remove(userId);
+        return filmStorage.findFilmById(filmId);
+    }
+
+    public List<Film> findPopularFilms(Integer count) {
+        if (filmStorage.findAll().isEmpty()) {
+            throw new FilmNotFoundException("Film collection is empty.");
+        }
+        return filmStorage.findAll().stream().sorted((o1, o2) -> o2.getLikes().size() - o1.getLikes().size()).limit(count).collect(Collectors.toList());
     }
 
 }
+
+
+
 
