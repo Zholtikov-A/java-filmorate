@@ -1,10 +1,15 @@
+
 package ru.yandex.practicum.filmorate.controller;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import ru.yandex.practicum.filmorate.exceptions.UserAlreadyExistException;
+import ru.yandex.practicum.filmorate.exceptions.UserNotFoundException;
 import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
+import ru.yandex.practicum.filmorate.storage.user.InMemoryUserStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.time.Month;
@@ -13,14 +18,16 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UserControllerTest {
-    static UserService service;
-    static UserController controller;
+    static UserStorage userStorage;
+    static UserService userService;
+    static UserController userController;
 
 
     @BeforeEach
     void init() {
-        service = new UserService();
-        controller = new UserController(service);
+        userStorage = new InMemoryUserStorage();
+        userService = new UserService(userStorage);
+        userController = new UserController(userService);
     }
 
     @Test
@@ -31,9 +38,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(user), "List of users contains such user, but should not.");
-        controller.create(user);
-        assertTrue(controller.findAll().contains(user), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
                 "User creation failed");
     }
 
@@ -45,9 +52,9 @@ class UserControllerTest {
                 .name(null)
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay()))
                 .build();
-        assertFalse(controller.findAll().contains(user), "List of users contains such user, but should not.");
-        controller.create(user);
-        assertTrue(controller.findAll().contains(user), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
                 "User creation failed");
     }
 
@@ -59,9 +66,9 @@ class UserControllerTest {
                 .name("")
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay()))
                 .build();
-        assertFalse(controller.findAll().contains(user), "List of users contains such user, but should not.");
-        controller.create(user);
-        assertTrue(controller.findAll().contains(user), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
                 "User creation failed");
     }
 
@@ -73,9 +80,9 @@ class UserControllerTest {
                 .name("    ")
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay()))
                 .build();
-        assertFalse(controller.findAll().contains(user), "List of users contains such user, but should not.");
-        controller.create(user);
-        assertTrue(controller.findAll().contains(user), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
                 "User creation failed");
     }
 
@@ -89,7 +96,7 @@ class UserControllerTest {
                 .build();
         boolean isValidationException = false;
         try {
-            controller.create(user);
+            userController.create(user);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"email\" can't be empty/null and must contains" +
                     " \"@\" symbol. Input received: \"null\"");
@@ -108,7 +115,7 @@ class UserControllerTest {
                 .build();
         boolean isValidationException = false;
         try {
-            controller.create(user);
+            userController.create(user);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"email\" can't be empty/null and must contains" +
                     " \"@\" symbol. Input received: \"\"");
@@ -127,7 +134,7 @@ class UserControllerTest {
                 .build();
         boolean isValidationException = false;
         try {
-            controller.create(user);
+            userController.create(user);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"email\" can't be empty/null and must contains" +
                     " \"@\" symbol. Input received: \"    \"");
@@ -146,7 +153,7 @@ class UserControllerTest {
                 .build();
         boolean isValidationException = false;
         try {
-            controller.create(user);
+            userController.create(user);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"login\" can't be empty/null or contains space symbol. " +
                     "Input received: \"null\"");
@@ -165,7 +172,7 @@ class UserControllerTest {
                 .build();
         boolean isValidationException = false;
         try {
-            controller.create(user);
+            userController.create(user);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"login\" can't be empty/null or contains space symbol. " +
                     "Input received: \"\"");
@@ -184,7 +191,7 @@ class UserControllerTest {
                 .build();
         boolean isValidationException = false;
         try {
-            controller.create(user);
+            userController.create(user);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"login\" can't be empty/null or contains space symbol. " +
                     "Input received: \"Use r\"");
@@ -203,9 +210,65 @@ class UserControllerTest {
                 .build();
         boolean isValidationException = false;
         try {
-            controller.create(user);
+            userController.create(user);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"birthday\" can't contain future date. Input received: \"+999999999-12-31\"");
+            isValidationException = true;
+        }
+        assertTrue(isValidationException, "ValidationException expected, but didn't appear.");
+    }
+
+    @Test
+    void createUserFailInCauseOfEmailAlreadyExist() {
+        User user = User.builder()
+                .email("user@usermail.com")
+                .login("User")
+                .name("Username Name")
+                .birthday(LocalDate.of(1988, Month.MARCH, 28))
+                .build();
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
+                "User creation failed");
+        User anotherUser = User.builder()
+                .email("user@usermail.com")
+                .login("AnotherUser")
+                .name("Username Name")
+                .birthday(LocalDate.of(1988, Month.MARCH, 28))
+                .build();
+        boolean isValidationException = false;
+        try {
+            userController.create(anotherUser);
+        } catch (UserAlreadyExistException exception) {
+            assertEquals(exception.getMessage(), "Email \"user@usermail.com\" is already in use.");
+            isValidationException = true;
+        }
+        assertTrue(isValidationException, "ValidationException expected, but didn't appear.");
+    }
+
+    @Test
+    void createUserFailInCauseOfLoginAlreadyExist() {
+        User user = User.builder()
+                .email("user@usermail.com")
+                .login("User")
+                .name("Username Name")
+                .birthday(LocalDate.of(1988, Month.MARCH, 28))
+                .build();
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
+                "User creation failed");
+        User anotherUser = User.builder()
+                .email("anotherUser@usermail.com")
+                .login("User")
+                .name("Username Name")
+                .birthday(LocalDate.of(1988, Month.MARCH, 28))
+                .build();
+        boolean isValidationException = false;
+        try {
+            userController.create(anotherUser);
+        } catch (UserAlreadyExistException exception) {
+            assertEquals(exception.getMessage(), "Login \"User\" is already in use.");
             isValidationException = true;
         }
         assertTrue(isValidationException, "ValidationException expected, but didn't appear.");
@@ -219,9 +282,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         User updatedUser = User.builder()
                 .email("updateduser@usermail.com")
@@ -230,9 +293,9 @@ class UserControllerTest {
                 .birthday(LocalDate.of(1998, Month.MARCH, 28))
                 .id(initialUser.getId())
                 .build();
-        assertFalse(controller.findAll().contains(updatedUser), "List of users contains such user, but should not.");
-        controller.update(updatedUser);
-        assertTrue(controller.findAll().contains(updatedUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(updatedUser), "List of users contains such user, but should not.");
+        userController.update(updatedUser);
+        assertTrue(userController.findAll().contains(updatedUser), "List of users don't contains such user. " +
                 "User update failed");
         assertNotEquals(initialUser, updatedUser, "Initial user is equals updated user. User update failed");
     }
@@ -245,9 +308,9 @@ class UserControllerTest {
                 .name(null)
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay()))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         User updatedUser = User.builder()
                 .email("F@")
@@ -256,9 +319,9 @@ class UserControllerTest {
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay().minusDays(1)))
                 .id(initialUser.getId())
                 .build();
-        assertFalse(controller.findAll().contains(updatedUser), "List of users contains such user, but should not.");
-        controller.update(updatedUser);
-        assertTrue(controller.findAll().contains(updatedUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(updatedUser), "List of users contains such user, but should not.");
+        userController.update(updatedUser);
+        assertTrue(userController.findAll().contains(updatedUser), "List of users don't contains such user. " +
                 "User update failed");
         assertNotEquals(initialUser, updatedUser, "Initial user is equals updated user. User update failed");
     }
@@ -271,9 +334,9 @@ class UserControllerTest {
                 .name("")
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay()))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         User updatedUser = User.builder()
                 .email("F@")
@@ -282,9 +345,9 @@ class UserControllerTest {
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay().minusDays(1)))
                 .id(initialUser.getId())
                 .build();
-        assertFalse(controller.findAll().contains(updatedUser), "List of users contains such user, but should not.");
-        controller.update(updatedUser);
-        assertTrue(controller.findAll().contains(updatedUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(updatedUser), "List of users contains such user, but should not.");
+        userController.update(updatedUser);
+        assertTrue(userController.findAll().contains(updatedUser), "List of users don't contains such user. " +
                 "User update failed");
         assertNotEquals(initialUser, updatedUser, "Initial user is equals updated user. User update failed");
     }
@@ -297,9 +360,9 @@ class UserControllerTest {
                 .name("    ")
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay()))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         User updatedUser = User.builder()
                 .email("F@")
@@ -308,9 +371,9 @@ class UserControllerTest {
                 .birthday(LocalDate.from(LocalDate.now().atStartOfDay().minusDays(1)))
                 .id(initialUser.getId())
                 .build();
-        assertFalse(controller.findAll().contains(updatedUser), "List of users contains such user, but should not.");
-        controller.update(updatedUser);
-        assertTrue(controller.findAll().contains(updatedUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(updatedUser), "List of users contains such user, but should not.");
+        userController.update(updatedUser);
+        assertTrue(userController.findAll().contains(updatedUser), "List of users don't contains such user. " +
                 "User update failed");
         assertNotEquals(initialUser, updatedUser, "Initial user is equals updated user. User update failed");
     }
@@ -323,9 +386,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -336,7 +399,7 @@ class UserControllerTest {
                     .birthday(LocalDate.of(1998, Month.MARCH, 28))
                     .id(initialUser.getId())
                     .build();
-            controller.update(updatedUser);
+            userController.update(updatedUser);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"email\" can't be empty/null and must contains" +
                     " \"@\" symbol. Input received: \"null\"");
@@ -353,9 +416,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -366,7 +429,7 @@ class UserControllerTest {
                     .birthday(LocalDate.of(1998, Month.MARCH, 28))
                     .id(initialUser.getId())
                     .build();
-            controller.update(updatedUser);
+            userController.update(updatedUser);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"email\" can't be empty/null and must contains" +
                     " \"@\" symbol. Input received: \"\"");
@@ -383,9 +446,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -396,7 +459,7 @@ class UserControllerTest {
                     .birthday(LocalDate.of(1998, Month.MARCH, 28))
                     .id(initialUser.getId())
                     .build();
-            controller.update(updatedUser);
+            userController.update(updatedUser);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"email\" can't be empty/null and must contains" +
                     " \"@\" symbol. Input received: \"    \"");
@@ -413,9 +476,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -426,7 +489,7 @@ class UserControllerTest {
                     .birthday(LocalDate.of(1998, Month.MARCH, 28))
                     .id(initialUser.getId())
                     .build();
-            controller.update(updatedUser);
+            userController.update(updatedUser);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"login\" can't be empty/null or contains space symbol. " +
                     "Input received: \"null\"");
@@ -443,9 +506,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -456,7 +519,7 @@ class UserControllerTest {
                     .birthday(LocalDate.of(1998, Month.MARCH, 28))
                     .id(initialUser.getId())
                     .build();
-            controller.update(updatedUser);
+            userController.update(updatedUser);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"login\" can't be empty/null or contains space symbol. " +
                     "Input received: \"\"");
@@ -473,9 +536,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -486,7 +549,7 @@ class UserControllerTest {
                     .birthday(LocalDate.of(1998, Month.MARCH, 28))
                     .id(initialUser.getId())
                     .build();
-            controller.update(updatedUser);
+            userController.update(updatedUser);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"login\" can't be empty/null or contains space symbol. " +
                     "Input received: \"Updated User\"");
@@ -503,9 +566,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -516,7 +579,7 @@ class UserControllerTest {
                     .birthday(LocalDate.MAX)
                     .id(initialUser.getId())
                     .build();
-            controller.update(updatedUser);
+            userController.update(updatedUser);
         } catch (ValidationException exception) {
             assertEquals(exception.getMessage(), "Field \"birthday\" can't contain future date. Input received: \"+999999999-12-31\"");
             isValidationException = true;
@@ -532,9 +595,9 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        assertFalse(controller.findAll().contains(initialUser), "List of users contains such user, but should not.");
-        controller.create(initialUser);
-        assertTrue(controller.findAll().contains(initialUser), "List of users don't contains such user. " +
+        assertFalse(userController.findAll().contains(initialUser), "List of users contains such user, but should not.");
+        userController.create(initialUser);
+        assertTrue(userController.findAll().contains(initialUser), "List of users don't contains such user. " +
                 "User creation failed");
         boolean isValidationException = false;
         try {
@@ -545,9 +608,9 @@ class UserControllerTest {
                     .birthday(LocalDate.of(1998, Month.MARCH, 28))
                     .id(-1L)
                     .build();
-            controller.update(updatedUser);
-        } catch (ValidationException exception) {
-            assertEquals(exception.getMessage(), "User with such ID not found. Input received: \"-1\"");
+            userController.update(updatedUser);
+        } catch (UserNotFoundException exception) {
+            assertEquals(exception.getMessage(), "User with id \"-1\" not found.");
             isValidationException = true;
         }
         assertTrue(isValidationException, "ValidationException expected, but didn't appear.");
@@ -555,7 +618,7 @@ class UserControllerTest {
 
     @Test
     void findAllSuccessfulCreationOfUserList() {
-        final List<User> emptyList = controller.findAll();
+        final List<User> emptyList = userController.findAll();
         assertNotNull(emptyList, "Method returns null");
         assertTrue(emptyList.isEmpty(), "Method returns not empty list.");
         User user = User.builder()
@@ -564,9 +627,51 @@ class UserControllerTest {
                 .name("Username Name")
                 .birthday(LocalDate.of(1988, Month.MARCH, 28))
                 .build();
-        controller.create(user);
-        final List<User> notEmptyList = controller.findAll();
+        userController.create(user);
+        final List<User> notEmptyList = userController.findAll();
         assertFalse(notEmptyList.isEmpty(), "Method returns empty list");
-        assertTrue(controller.findAll().contains(user), "List of users don't contains such user.");
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user.");
     }
+
+    @Test
+    void getUserByIdSuccessfulReturnUserWithId1() {
+        User user = User.builder()
+                .email("user@usermail.com")
+                .login("User")
+                .name("Username Name")
+                .birthday(LocalDate.of(1988, Month.MARCH, 28))
+                .build();
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
+                "User creation failed");
+        User savedUser = userController.findUserById(1L);
+        user.setId(savedUser.getId());
+        assertEquals(user, savedUser, "Users are not equals.");
+    }
+
+    @Test
+    void getUserByIdFailReturnUserWithNegativeId() {
+        User user = User.builder()
+                .email("user@usermail.com")
+                .login("User")
+                .name("Username Name")
+                .birthday(LocalDate.of(1988, Month.MARCH, 28))
+                .build();
+        assertFalse(userController.findAll().contains(user), "List of users contains such user, but should not.");
+        userController.create(user);
+        assertTrue(userController.findAll().contains(user), "List of users don't contains such user. " +
+                "User creation failed");
+        boolean isUserNotFoundException = false;
+        try {
+            User savedUser = userController.findUserById(-1L);
+            user.setId(savedUser.getId());
+            assertNotEquals(user, savedUser, "Users are equals.");
+        } catch (UserNotFoundException exception) {
+            assertEquals(exception.getMessage(), "User with id \"-1\" not found.");
+            isUserNotFoundException = true;
+        }
+        assertTrue(isUserNotFoundException, "UserNotFoundException expected, but didn't appear.");
+    }
+
 }

@@ -1,99 +1,71 @@
 package ru.yandex.practicum.filmorate.service;
 
-import lombok.AccessLevel;
-import lombok.experimental.FieldDefaults;
-import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.*;
-import ru.yandex.practicum.filmorate.exceptions.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.time.LocalDate;
-import java.time.chrono.ChronoLocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
-@Slf4j
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@RequiredArgsConstructor
 public class UserService {
 
-    final Map<Long, User> users = new HashMap<>();
+    private final UserStorage userStorage;
 
-    Long userId = 0L;
-
-    Long generateUserId() {
-        return ++userId;
-    }
-
-    @PostMapping
     public User create(User user) {
-        if (user.getEmail() == null || user.getEmail().isEmpty() || user.getEmail().isBlank() || !user.getEmail().contains("@")) {
-            String message = "Field \"email\" can't be empty/null and must contains \"@\" symbol. Input received: "
-                    + "\"" + user.getEmail() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if
-        (user.getLogin() == null || user.getLogin().isEmpty() || user.getLogin().isBlank() || user.getLogin().contains(" ")) {
-            String message = "Field \"login\" can't be empty/null or contains space symbol. Input received: \"" + user.getLogin() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (user.getBirthday().isAfter(ChronoLocalDate.from(LocalDate.now().atStartOfDay()))) {
-            String message = "Field \"birthday\" can't contain future date. Input received: \"" + user.getBirthday() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else {
-            if (user.getName() == null || user.getName().isEmpty() || user.getName().isBlank()) {
-                String invalidUserName = user.getName();
-                user.setName(user.getLogin());
-                log.info("Value \"" + invalidUserName + "\" of field \"name\" is invalid, value of field \"login\" " +
-                        "was set up as value of field \"name\". Current value of field \"name\" is " + user.getName());
-            }
-            user.setId(generateUserId());
-            users.put(user.getId(), user);
-            log.info("New user created: " + user);
-            return user;
-        }
+        return userStorage.create(user);
     }
 
-    @PutMapping
     public User update(User user) {
-        if (!users.containsKey(user.getId())) {
-            String message = "User with such ID not found. Input received: \"" + user.getId() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (user.getEmail() == null || user.getEmail().isEmpty() || user.getEmail().isBlank() || !user.getEmail().contains("@")) {
-            String message = "Field \"email\" can't be empty/null and must contains \"@\" symbol. Input received: "
-                    + "\"" + user.getEmail() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if
-        (user.getLogin() == null || user.getLogin().isEmpty() || user.getLogin().isBlank() || user.getLogin().contains(" ")) {
-            String message = "Field \"login\" can't be empty/null or contains space symbol. Input received: \"" + user.getLogin() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (user.getBirthday().isAfter(ChronoLocalDate.from(LocalDate.now().atStartOfDay()))) {
-            String message = "Field \"birthday\" can't contain future date. Input received: \"" + user.getBirthday() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else {
-            if (user.getName() == null || user.getName().isEmpty() || user.getName().isBlank()) {
-                String invalidUserName = user.getName();
-                user.setName(user.getLogin());
-                log.info("Value \"" + invalidUserName + "\" of field \"name\" is invalid, value of field \"login\" " +
-                        "was set up as value of field \"name\". Current value of field \"name\" is " + user.getName());
-            }
-            users.replace(user.getId(), user);
-            log.info("User with ID=" + user.getId() + " updated:  " + user);
-            return user;
-        }
+        return userStorage.update(user);
     }
 
-    @GetMapping
     public List<User> findAll() {
-        return new ArrayList<>(users.values());
+        return userStorage.findAll();
+    }
+
+    public User findUserById(Long userId) {
+        return userStorage.findUserById(userId);
+    }
+
+    public User addFriend(Long userId, Long friendId) {
+        User user = userStorage.findUserById(userId);
+        User friend = userStorage.findUserById(friendId);
+        user.getFriends().add(friendId);
+        friend.getFriends().add(userId);
+        return user;
+    }
+
+    public User removeFriend(Long userId, Long friendId) {
+        User user = userStorage.findUserById(userId);
+        User friend = userStorage.findUserById(friendId);
+        user.getFriends().remove(friendId);
+        friend.getFriends().remove(userId);
+        return user;
+    }
+
+    public List<User> findFriends(Long userId) {
+        userStorage.findUserById(userId);        //throws UserNotFoundException
+        return userStorage.findAll().stream()
+                .filter(user -> user.getFriends().contains(userId))
+                .collect(Collectors.toList());
+    }
+
+
+    public List<User> getCommonFriends(Long userId, Long otherId) {
+        User user = userStorage.findUserById(userId);
+        User otherUser = userStorage.findUserById(otherId);
+        Set<Long> userFriends = user.getFriends();
+        Set<Long> otherUserFriends = otherUser.getFriends();
+        Set<Long> intersectSet = new HashSet<>(userFriends);
+        intersectSet.retainAll(otherUserFriends);
+        List<User> commonFriends = new ArrayList<>();
+        for (Long id : intersectSet) {
+            commonFriends.add(userStorage.findUserById(id));
+        }
+        return commonFriends;
     }
 
 }
