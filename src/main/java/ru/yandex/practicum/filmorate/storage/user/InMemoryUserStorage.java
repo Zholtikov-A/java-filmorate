@@ -31,6 +31,36 @@ public class InMemoryUserStorage implements UserStorage {
 
     @Override
     public User create(User user) {
+        validateFields(user);
+        user.setId(generateUserId());
+        users.put(user.getId(), user);
+        log.info("New user created: " + user);
+        return user;
+    }
+
+    @Override
+    public User update(User user) {
+        findUserById(user.getId());    //throws UserNotFoundException
+        validateFields(user);
+        users.replace(user.getId(), user);
+        log.info("User with ID=" + user.getId() + " updated:  " + user);
+        return user;
+    }
+
+    @Override
+    public List<User> findAll() {
+        return new ArrayList<>(users.values());
+    }
+
+    @Override
+    public User findUserById(Long userId) {
+        if (!users.containsKey(userId)) {
+            throw new UserNotFoundException("User with id \"" + userId + "\" not found.");
+        }
+        return users.get(userId);
+    }
+
+    private void validateFields(User user) {
         if (user.getEmail() == null || user.getEmail().isEmpty() || user.getEmail().isBlank() || !user.getEmail().contains("@")) {
             String message = "Field \"email\" can't be empty/null and must contains \"@\" symbol. Input received: "
                     + "\"" + user.getEmail() + "\"";
@@ -61,66 +91,7 @@ public class InMemoryUserStorage implements UserStorage {
                     throw new UserAlreadyExistException(message);
                 }
             }
-            user.setId(generateUserId());
-            users.put(user.getId(), user);
-            log.info("New user created: " + user);
-            return user;
         }
-    }
-
-    @Override
-    public User update(User user) {
-        if (!users.containsKey(user.getId())) {
-            String message = "User with such ID not found. Input received: \"" + user.getId() + "\"";
-            log.info("Validation failed! " + message);
-            throw new UserNotFoundException(message);
-        } else if (user.getEmail() == null || user.getEmail().isEmpty() || user.getEmail().isBlank() || !user.getEmail().contains("@")) {
-            String message = "Field \"email\" can't be empty/null and must contains \"@\" symbol. Input received: "
-                    + "\"" + user.getEmail() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if
-        (user.getLogin() == null || user.getLogin().isEmpty() || user.getLogin().isBlank() || user.getLogin().contains(" ")) {
-            String message = "Field \"login\" can't be empty/null or contains space symbol. Input received: \"" + user.getLogin() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else if (user.getBirthday().isAfter(ChronoLocalDate.from(LocalDate.now().atStartOfDay()))) {
-            String message = "Field \"birthday\" can't contain future date. Input received: \"" + user.getBirthday() + "\"";
-            log.info("Validation failed! " + message);
-            throw new ValidationException(message);
-        } else {
-            if (user.getName() == null || user.getName().isEmpty() || user.getName().isBlank()) {
-                String invalidUserName = user.getName();
-                user.setName(user.getLogin());
-                log.info("Value \"" + invalidUserName + "\" of field \"name\" is invalid, value of field \"login\" " +
-                        "was set up as value of field \"name\". Current value of field \"name\" is " + user.getName());
-            }
-            for (User existUser : users.values()) {
-                if (user.getEmail().equals(existUser.getEmail())) {
-                    String message = "Email \"" + user.getEmail() + "\" is already in use.";
-                    throw new UserAlreadyExistException(message);
-                } else if (user.getLogin().equals(existUser.getLogin())) {
-                    String message = "Login \"" + user.getLogin() + "\" is already in use.";
-                    throw new UserAlreadyExistException(message);
-                }
-            }
-            users.replace(user.getId(), user);
-            log.info("User with ID=" + user.getId() + " updated:  " + user);
-            return user;
-        }
-    }
-
-    @Override
-    public List<User> findAll() {
-        return new ArrayList<>(users.values());
-    }
-
-    @Override
-    public User findUserById(Long userId) {
-        if (!users.containsKey(userId)) {
-            throw new UserNotFoundException("User with id \"" + userId + "\" not found.");
-        }
-        return users.get(userId);
     }
 
 }

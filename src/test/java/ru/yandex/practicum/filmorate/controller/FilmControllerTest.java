@@ -32,7 +32,7 @@ class FilmControllerTest {
         filmStorage = new InMemoryFilmStorage();
         userStorage = new InMemoryUserStorage();
         filmService = new FilmService(filmStorage, userStorage);
-        filmController = new FilmController(filmService, (InMemoryFilmStorage) filmStorage);
+        filmController = new FilmController(filmService);
     }
 
     @Test
@@ -392,7 +392,7 @@ class FilmControllerTest {
                     .build();
             filmController.update(updatedFilm);
         } catch (FilmNotFoundException exception) {
-            assertEquals(exception.getMessage(), "Film with such ID not found. Input received: \"-1\"");
+            assertEquals(exception.getMessage(), "Film with id \"-1\" not found.");
             isValidationException = true;
         }
         assertTrue(isValidationException, "ValidationException expected, but didn't appear.");

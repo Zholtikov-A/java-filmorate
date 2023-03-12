@@ -27,7 +27,7 @@ class UserControllerTest {
     void init() {
         userStorage = new InMemoryUserStorage();
         userService = new UserService(userStorage);
-        userController = new UserController(userService, (InMemoryUserStorage) userStorage);
+        userController = new UserController(userService);
     }
 
     @Test
@@ -610,7 +610,7 @@ class UserControllerTest {
                     .build();
             userController.update(updatedUser);
         } catch (UserNotFoundException exception) {
-            assertEquals(exception.getMessage(), "User with such ID not found. Input received: \"-1\"");
+            assertEquals(exception.getMessage(), "User with id \"-1\" not found.");
             isValidationException = true;
         }
         assertTrue(isValidationException, "ValidationException expected, but didn't appear.");

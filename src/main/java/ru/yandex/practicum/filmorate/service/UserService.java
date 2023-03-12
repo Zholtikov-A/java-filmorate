@@ -2,11 +2,11 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.filmorate.exceptions.UserNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -14,61 +14,56 @@ public class UserService {
 
     private final UserStorage userStorage;
 
+    public User create(User user) {
+        return userStorage.create(user);
+    }
+
+    public User update(User user) {
+        return userStorage.update(user);
+    }
+
+    public List<User> findAll() {
+        return userStorage.findAll();
+    }
+
+    public User findUserById(Long userId) {
+        return userStorage.findUserById(userId);
+    }
+
     public User addFriend(Long userId, Long friendId) {
-        boolean isUserIdCorrect = false;
-        boolean isFriendIdCorrect = false;
-        for (User user : userStorage.findAll()) {
-            if (user.getId() == userId) {
-                isUserIdCorrect = true;
-            } else if (user.getId() == friendId) {
-                isFriendIdCorrect = true;
-            }
-        }
-        if (!isUserIdCorrect) {
-            throw new UserNotFoundException("User with ID \"" + userId + "\" not found");
-        } else if (!isFriendIdCorrect) {
-            throw new UserNotFoundException("User with ID \"" + friendId + "\" not found");
-        }
-        userStorage.findUserById(userId).getFriends().add(friendId);
-        userStorage.findUserById(friendId).getFriends().add(userId);
-        return userStorage.findUserById(friendId);
+        User user = userStorage.findUserById(userId);
+        User friend = userStorage.findUserById(friendId);
+        user.getFriends().add(friendId);
+        friend.getFriends().add(userId);
+        return user;
     }
 
     public User removeFriend(Long userId, Long friendId) {
-        boolean isUserIdCorrect = false;
-        boolean isFriendIdCorrect = false;
-        for (User user : userStorage.findAll()) {
-            if (user.getId() == userId) {
-                isUserIdCorrect = true;
-            }
-            if (user.getId() == friendId) {
-                isFriendIdCorrect = true;
-            }
-        }
-        if (!isUserIdCorrect) {
-            throw new UserNotFoundException("User with ID \"" + userId + "\" not found");
-        } else if (!isFriendIdCorrect) {
-            throw new UserNotFoundException("User with ID \"" + friendId + "\" not found");
-        }
-        userStorage.findUserById(userId).getFriends().remove(friendId);
-        return userStorage.findUserById(friendId);
+        User user = userStorage.findUserById(userId);
+        User friend = userStorage.findUserById(friendId);
+        user.getFriends().remove(friendId);
+        friend.getFriends().remove(userId);
+        return user;
     }
 
     public List<User> findFriends(Long userId) {
-        List<User> friends = new ArrayList<>();
-        for (Long friendId : userStorage.findUserById(userId).getFriends()) {
-            friends.add(userStorage.findUserById(friendId));
-        }
-        return friends;
+        userStorage.findUserById(userId);        //throws UserNotFoundException
+        return userStorage.findAll().stream()
+                .filter(user -> user.getFriends().contains(userId))
+                .collect(Collectors.toList());
     }
 
-    public Set<User> getCommonFriends(Long userId, Long otherId) {
 
-        Set<User> commonFriends = new HashSet<>();
-        for (Long friendId : userStorage.findUserById(userId).getFriends()) {
-            if (userStorage.findUserById(otherId).getFriends().contains(friendId)) {
-                commonFriends.add(userStorage.findUserById(friendId));
-            }
+    public List<User> getCommonFriends(Long userId, Long otherId) {
+        User user = userStorage.findUserById(userId);
+        User otherUser = userStorage.findUserById(otherId);
+        Set<Long> userFriends = user.getFriends();
+        Set<Long> otherUserFriends = otherUser.getFriends();
+        Set<Long> intersectSet = new HashSet<>(userFriends);
+        intersectSet.retainAll(otherUserFriends);
+        List<User> commonFriends = new ArrayList<>();
+        for (Long id : intersectSet) {
+            commonFriends.add(userStorage.findUserById(id));
         }
         return commonFriends;
     }

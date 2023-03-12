@@ -19,4 +19,5 @@ public class User {
     String name;
     LocalDate birthday;
     final Set<Long> friends = new LinkedHashSet<>();
+
 }
