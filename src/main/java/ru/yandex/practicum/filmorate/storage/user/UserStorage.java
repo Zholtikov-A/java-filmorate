@@ -12,7 +12,7 @@ public interface UserStorage {
 
     List<User> findAll();
 
-    User findUserById(Long userId);
+    User findUserById(Long Id);
 
 
 }
