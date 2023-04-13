@@ -33,7 +33,7 @@ public class UserService {
     }
 
     public User update(User user) {
-        userDao.checkUserExistence(user.getId()); // NotFoundException
+        userDao.checkUserExistence(user.getId());
         return userDao.update(checkUserName(user));
     }
 
@@ -70,6 +70,7 @@ public class UserService {
     }
 
     public User findUserById(Long id) {
+        userDao.checkUserExistence(id);
         return userDao.findUserById(id);
     }
 }

@@ -10,13 +10,14 @@ import ru.yandex.practicum.filmorate.exceptions.CustomValidationException;
 import ru.yandex.practicum.filmorate.exceptions.UserNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 
-
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -57,19 +58,22 @@ public class UserDaoImpl implements UserDao {
     @Override
     public List<User> findAll() {
         String sql = "select * from filmorate.users";
-        return jdbcTemplate.query(sql, this::mapRowToUser);
+        List<Optional<User>> queryResult = jdbcTemplate.query(sql, this::mapRowToUser);
+        List<User> users = new ArrayList<>();
+        for (Optional<User> optionalUser : queryResult) {
+            optionalUser.ifPresent(users::add);
+        }
+        return users;
     }
 
     @Override
     public User findUserById(Long id) {
-
         final String sql = "select * from filmorate.users where USER_ID = ?";
-        final List<User> users = jdbcTemplate.query(sql, this::mapRowToUser, id);
-
-        if (users.size() == 0) {
+        Optional<User> optionalUser = jdbcTemplate.queryForObject(sql, this::mapRowToUser, id);
+        if (optionalUser.isEmpty()) {
             throw new UserNotFoundException("User with id \"" + id + "\" not found.");
         } else {
-            return users.get(0);
+            return optionalUser.get();
         }
     }
 
@@ -93,20 +97,28 @@ public class UserDaoImpl implements UserDao {
                 "from filmorate.friendship_user_to_user_link as f " +
                 "where f.user_id = ?);";
 
-        return jdbcTemplate.query(sql, this::mapRowToUser, userId);
+        List<Optional<User>> queryResult = jdbcTemplate.query(sql, this::mapRowToUser, userId);
+        List<User> users = new ArrayList<>();
+        for (Optional<User> optionalUser : queryResult) {
+            optionalUser.ifPresent(users::add);
+        }
+        return users;
     }
 
     public List<User> findCommonFriends(Long userId, Long otherUserId) {
-        final String sql = "select * " +
-                "from filmorate.users as u " +
-                "where u.USER_ID in (select f.friend_id " +
-                "from filmorate.friendship_user_to_user_link as f " +
-                "where f.user_id = ? " +
-                "and f.friend_id in (select f1.friend_id " +
+        final String sql = "select u.* " +
                 "from filmorate.friendship_user_to_user_link as f1 " +
-                "where f1.user_id = ? ));";
+                "join filmorate.friendship_user_to_user_link as f2 on f2.friend_id = f1.friend_id " +
+                "join filmorate.users as u on f1.friend_id = u.user_id " +
+                "where f1.user_id = ? " +
+                "and f2.user_id = ? ; ";
 
-        return jdbcTemplate.query(sql, this::mapRowToUser, userId, otherUserId);
+        List<Optional<User>> queryResult = jdbcTemplate.query(sql, this::mapRowToUser, userId, otherUserId);
+        List<User> users = new ArrayList<>();
+        for (Optional<User> optionalUser : queryResult) {
+            optionalUser.ifPresent(users::add);
+        }
+        return users;
     }
 
     public User removeFriend(Long userId, Long friendId) {
@@ -116,31 +128,24 @@ public class UserDaoImpl implements UserDao {
         return findUserById(userId);
     }
 
-    private User mapRowToUser(ResultSet resultSet, int rowNum) throws SQLException {
-        return User.builder()
+    private Optional<User> mapRowToUser(ResultSet resultSet, int rowNum) throws SQLException {
+        User user = User.builder()
                 .id(resultSet.getLong("USER_ID"))
                 .email(resultSet.getString("email"))
                 .login(resultSet.getString("login"))
                 .name(resultSet.getString("name"))
                 .birthday(resultSet.getDate("birthday").toLocalDate())
                 .build();
+        return Optional.of(user);
     }
 
     @Override
     public void checkUserExistence(Long id) {
-
-        final String sql = "select * from filmorate.users where USER_ID = ?";
-        final List<User> users = jdbcTemplate.query(sql, this::mapUserId, id);
-
-        if (users.isEmpty()) {
+        final String sql = "select COUNT(u.user_id) from filmorate.users as u where user_id = ?";
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
+        if (count == null || count == 0) {
             throw new UserNotFoundException("User with id \"" + id + "\" not found.");
         }
-    }
-
-    private User mapUserId(ResultSet resultSet, int rowNum) throws SQLException {
-        return User.builder()
-                .id(resultSet.getLong("USER_ID"))
-                .build();
     }
 
 }

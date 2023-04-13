@@ -15,8 +15,10 @@ import ru.yandex.practicum.filmorate.model.Mpa;
 
 import java.io.IOException;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -102,7 +104,6 @@ public class FilmDaoImpl implements FilmDao {
 
     @Override
     public List<Film> findAll() {
-
         final String sql = "select f.film_id, f.name as film_name, f.description, f.release_date, f.duration, " +
                 "m.mpa_rating_id, m.name as mpa_name, json_arrayagg(json_object(" +
                 "  KEY 'id' VALUE g.genre_id," +
@@ -116,7 +117,12 @@ public class FilmDaoImpl implements FilmDao {
                 "left join filmorate.likes_films_users_link as lk on lk.film_id = f.film_id " +
                 "group by f.film_id ";
 
-        return jdbcTemplate.query(sql, this::mapRowToFilm);
+        List<Optional<Film>> queryResult = jdbcTemplate.query(sql, this::mapRowToFilm);
+        List<Film> films = new ArrayList<>();
+        for (Optional<Film> optionalFilm : queryResult) {
+            optionalFilm.ifPresent(films::add);
+        }
+        return films;
     }
 
     @Override
@@ -127,27 +133,22 @@ public class FilmDaoImpl implements FilmDao {
                 "  KEY 'id' VALUE g.genre_id," +
                 "  KEY 'name' VALUE g.name" +
                 ")) as genres, " +
-                // mine 1 line below
                 " COUNT(lk.user_id) as rate " +
                 "from filmorate.films as f " +
                 "left join filmorate.mpa_rating as m on f.mpa_rating_id = m.mpa_rating_id " +
                 "left join filmorate.films_genre_link as fgl on f.film_id = fgl.film_id " +
                 "left join filmorate.genre as g on fgl.genre_id = g.genre_id " +
-                // mine 1 line below
                 "left join filmorate.likes_films_users_link as lk on lk.film_id = f.film_id " +
                 "where f.film_id = ? " +
                 "group by f.film_id ";
 
-        final List<Film> films = jdbcTemplate.query(sql, this::mapRowToFilm, id);
-
-
-        if (films.isEmpty()) {
+        Optional<Film> optionalFilm = jdbcTemplate.queryForObject(sql, this::mapRowToFilm, id);
+        if (optionalFilm.isEmpty()) {
             throw new FilmNotFoundException("Film with id \"" + id + "\" not found.");
         } else {
-            return films.get(0);
+            return optionalFilm.get();
         }
     }
-
 
     @Override
     public Film addLike(Long filmId, Long userId) {
@@ -173,7 +174,7 @@ public class FilmDaoImpl implements FilmDao {
         return findFilmById(filmId);
     }
 
-    private Film mapRowToFilm(ResultSet resultSet, int rowNum) throws SQLException {
+    private Optional<Film> mapRowToFilm(ResultSet resultSet, int rowNum) throws SQLException {
         Film film = Film.builder()
                 .id(resultSet.getLong("film_id"))
                 .name(resultSet.getString("film_name"))
@@ -200,24 +201,18 @@ public class FilmDaoImpl implements FilmDao {
                     film.getGenres().add(genre);
             }
         }
-        return film;
+        return Optional.of(film);
     }
 
     @Override
     public void checkFilmExistence(Long id) {
-        final String sql = "select f.film_id, " +
+        final String sql = "select COUNT(f.film_id) " +
                 "from filmorate.films as f " +
                 "where f.film_id = ? ";
-        final List<Film> films = jdbcTemplate.query(sql, this::mapFilmId, id);
-        if (films.isEmpty()) {
+        Integer count = jdbcTemplate.queryForObject(sql, Integer.class, id);
+        if (count == null || count == 0) {
             throw new FilmNotFoundException("Film with id \"" + id + "\" not found.");
         }
-    }
-
-    private Film mapFilmId(ResultSet resultSet, int rowNum) throws SQLException {
-        return Film.builder()
-                .id(resultSet.getLong("film_id"))
-                .build();
     }
 
 }

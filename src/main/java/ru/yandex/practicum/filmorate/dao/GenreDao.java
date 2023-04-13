@@ -10,4 +10,6 @@ public interface GenreDao {
 
     Genre findGenreById(Long id);
 
+    void checkGenreExistence(Long id);
+
 }

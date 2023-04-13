@@ -9,4 +9,7 @@ public interface MpaDao {
     List<Mpa> findAll();
 
     Mpa findMpaById(Long id);
+
+    void checkMpaExistence(Long id);
+
 }

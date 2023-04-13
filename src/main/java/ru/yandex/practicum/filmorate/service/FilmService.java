@@ -9,8 +9,6 @@ import ru.yandex.practicum.filmorate.dao.FilmDao;
 import ru.yandex.practicum.filmorate.dao.UserDao;
 import ru.yandex.practicum.filmorate.exceptions.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
-import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
-import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,9 +18,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class FilmService {
-
-    final FilmStorage filmStorage;
-    final UserStorage userStorage;
 
     FilmDao filmDao;
     UserDao userDao;
@@ -63,7 +58,7 @@ public class FilmService {
     }
 
     public Film update(Film film) {
-        filmDao.checkFilmExistence(film.getId()); // NotFoundException
+        filmDao.checkFilmExistence(film.getId());
         log.info("Film " + film.getName() + " was successfully updated!");
         return filmDao.update(film);
     }
@@ -73,6 +68,7 @@ public class FilmService {
     }
 
     public Film findFilmById(Long id) {
+        filmDao.checkFilmExistence(id);
         return filmDao.findFilmById(id);
     }
 
