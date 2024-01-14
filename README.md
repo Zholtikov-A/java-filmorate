@@ -18,7 +18,7 @@
 * Получение подборки самых популярных фильмов
 
 ## Схема базы данных
-<img width="1012" alt="DataBase schema" src="assets/DbSchema.png">
+<img width="1012" alt="DataBase schema" src="assets/DBSchema.png">
 
 ## Инструкция по развёртыванию ▶️
 1) Склонируйте репозиторий: https://github.com/Zholtikov-A/java-filmorate.git
