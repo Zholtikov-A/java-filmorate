@@ -1,71 +1,76 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.experimental.FieldDefaults;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.filmorate.dao.UserDao;
 import ru.yandex.practicum.filmorate.model.User;
-import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class UserService {
 
-    private final UserStorage userStorage;
+    final UserDao userDao;
+
+    private User checkUserName(User user) {
+        if (user.getName() == null || user.getName().isEmpty() || user.getName().isBlank()) {
+            String invalidUserName = user.getName();
+            user.setName(user.getLogin());
+            log.info("Value \"" + invalidUserName + "\" of field \"name\" is invalid, value of field \"login\" " +
+                    "was set up as value of field \"name\". Current value of field \"name\" is " + user.getName());
+        }
+        return user;
+    }
 
     public User create(User user) {
-        return userStorage.create(user);
+        return userDao.create(checkUserName(user));
     }
 
     public User update(User user) {
-        return userStorage.update(user);
-    }
-
-    public List<User> findAll() {
-        return userStorage.findAll();
-    }
-
-    public User findUserById(Long userId) {
-        return userStorage.findUserById(userId);
+        userDao.checkUserExistence(user.getId());
+        return userDao.update(checkUserName(user));
     }
 
     public User addFriend(Long userId, Long friendId) {
-        User user = userStorage.findUserById(userId);
-        User friend = userStorage.findUserById(friendId);
-        user.getFriends().add(friendId);
-        friend.getFriends().add(userId);
-        return user;
+        userDao.checkUserExistence(userId);
+        userDao.checkUserExistence(friendId);
+
+        userDao.addFriend(userId, friendId);
+        log.info("Users with id \"" + userId +
+                "\" and \"" + friendId +
+                "\" are friends now!");
+        return userDao.findUserById(friendId);
     }
 
     public User removeFriend(Long userId, Long friendId) {
-        User user = userStorage.findUserById(userId);
-        User friend = userStorage.findUserById(friendId);
-        user.getFriends().remove(friendId);
-        friend.getFriends().remove(userId);
-        return user;
+        userDao.removeFriend(userId, friendId);
+        log.info("Users with id \"" + userId +
+                "\" and \"" + friendId +
+                "\" are not friends anymore!");
+        return userDao.findUserById(friendId);
     }
 
     public List<User> findFriends(Long userId) {
-        userStorage.findUserById(userId);        //throws UserNotFoundException
-        return userStorage.findAll().stream()
-                .filter(user -> user.getFriends().contains(userId))
-                .collect(Collectors.toList());
+        userDao.checkUserExistence(userId);
+        return userDao.findFriends(userId);
     }
 
-
-    public List<User> getCommonFriends(Long userId, Long otherId) {
-        User user = userStorage.findUserById(userId);
-        User otherUser = userStorage.findUserById(otherId);
-        Set<Long> userFriends = user.getFriends();
-        Set<Long> otherUserFriends = otherUser.getFriends();
-        Set<Long> intersectSet = new HashSet<>(userFriends);
-        intersectSet.retainAll(otherUserFriends);
-        List<User> commonFriends = new ArrayList<>();
-        for (Long id : intersectSet) {
-            commonFriends.add(userStorage.findUserById(id));
-        }
-        return commonFriends;
+    public List<User> findCommonFriends(Long userId, Long otherUserId) {
+        return userDao.findCommonFriends(userId, otherUserId);
     }
 
+    public List<User> findAll() {
+        return userDao.findAll();
+    }
+
+    public User findUserById(Long id) {
+        userDao.checkUserExistence(id);
+        return userDao.findUserById(id);
+    }
 }
